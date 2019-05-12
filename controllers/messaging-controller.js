@@ -13,15 +13,8 @@ const appConsumer = Consumer.create({
   queueUrl: process.env.QUEUE_URL,
   handleMessage: async (message) => {
     // do some work with `message`
-    console.log(message.Body);
-    findOrder(parseInt(message.Body))
-      .then(() => {
-        Promise.resolve();
-      })
-      .catch(err => {        
-        console.log(err);
-        Promise.reject(err);
-      })
+    console.log("Check order with id: ", message.Body);
+    return findOrder(parseInt(message.Body));
   },
   sqs: new AWS.SQS()
 });
@@ -40,7 +33,7 @@ appConsumer.on('timeout_error', (err) => {
 
 appConsumer.start();
 
-
+let emailSent = false;
 function findOrder(orderId) {
   return new Promise((resolve, reject) => {
     Order.findOne({ orderId: orderId })
@@ -50,8 +43,8 @@ function findOrder(orderId) {
         }
 
         if (order.userEmail) {
-          console.log("Sending email...");          
-          console.log("Message sent to email: ", order.userEmail);           
+          console.log("Sending email...");
+          console.log("Message sent to email: ", order.userEmail);
           emailSent = true;
         }
       })
@@ -60,20 +53,49 @@ function findOrder(orderId) {
           let message = new Messaging({ orderId: orderId, emailSent: true });
           return message.save(function (err, message) {
             if (err) {
-              return console.error(err)
+              return reject(err)
             } else {
               console.log(`Message sent for the order with id ${orderId} and saved to database.`);
-              resolve(message);
+              return resolve(message);
             }
           });
         }
       })
       .catch(err => {
-        /* res.status(500).send({
-          message: "Something wrong retrieving order with id " + orderId
-        }); */
         console.log("Something wrong retrieving order with id " + orderId);
         reject(err);
       });
   })
 };
+
+exports.findOne = (req, res) => {
+  Order.findOne({ orderId: req.params.orderId })
+    .then(order => {
+      if (!order) {
+        console.log(`Order with id ${req.params.orderId} not found`);
+      }
+
+      if (order.userEmail) {
+        console.log("Sending email...");
+        console.log("Message sent to email: ", order.userEmail);
+        emailSent = true;
+      }
+      res.send(order)
+    })
+    .then(() => {
+      if (emailSent) {
+        let message = new Messaging({ orderId: req.params.orderId, emailSent: true });
+        return message.save(function (err, message) {
+          if (err) {
+            console.error(err)
+          } else {
+            console.log(`Message sent for the order with id ${req.params.orderId} and saved to database.`);
+          }
+        });
+      }
+    })
+    .catch(err => {
+      console.log("Something wrong retrieving order with id " + req.params.orderId + " cause by error: ", err);
+    });
+}
+
