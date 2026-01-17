@@ -11,7 +11,7 @@
     "mongoose": "^8.20.1",
     "nodemailer": "^7.0.12",
     "nodemon": "^2.0.3",
-    "sqs-consumer": "^6.0.0"
+    "sqs-consumer": "^6.2.1"
   },
   "devDependencies": {
     "@babel/core": "^7.9.0",
